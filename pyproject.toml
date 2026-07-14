@@ -14,7 +14,3 @@ full = [
     "chardet",
     "Pillow",
 ]
-
-[project.scripts]
-epub2markdown = "epub_to_markdown:main"
-epub2html = "epub_to_html:main"
