@@ -1,0 +1,20 @@
+[project]
+name = "epub2markdown"
+version = "0.1.0"
+description = "Convert EPUB files to Markdown, preserving images and content structure."
+requires-python = ">=3.9"
+dependencies = [
+    "beautifulsoup4",
+    "html2text",
+]
+
+[project.optional-dependencies]
+# Optional: better encoding detection (chardet) and image auto-scaling (Pillow).
+full = [
+    "chardet",
+    "Pillow",
+]
+
+[project.scripts]
+epub2markdown = "epub_to_markdown:main"
+epub2html = "epub_to_html:main"
