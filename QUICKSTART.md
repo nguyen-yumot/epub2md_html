@@ -1,127 +1,103 @@
-# Quick Start Guide — EPUB to Markdown / HTML
+# Quick Start — Commands You Can Copy & Paste
 
-Two tools, same options and output layout — pick your format:
+Convert EPUB books into **Markdown** (`.md`) or **clean HTML** (`.html`).
 
-- **`epub_to_markdown.py`** → `<book>.md`  (editing, diffing, pipelines)
-- **`epub_to_html.py`** → `<book>.html`  (single self-styled file for reading in a browser)
+> **Before anything:** open a terminal *inside this project folder* (the one that
+> contains `pyproject.toml`). Every command below is run from here.
+> `uv run` sets everything up automatically the first time — no separate install step.
 
-Every command below works with either script — just swap the name.
+---
 
-## One-Time Setup
+## ⭐ The one you want: convert EVERY EPUB in a folder
 
-This project uses [uv](https://docs.astral.sh/uv/). Install uv, then from the project folder:
-
-```bash
-uv sync --extra full     # creates .venv and installs all dependencies
-```
-
-Run the commands below with `uv run` (e.g. `uv run python epub_to_markdown.py …`), or
-`source .venv/bin/activate` once and use `python3 …` directly.
-
-## Convert EPUB Files
-
-### Simplest Usage — Convert All EPUBs
+Put your books in the `epub_input/` folder, then run:
 
 ```bash
-# Run in a folder containing EPUB files
-python3 epub_to_markdown.py          # -> Markdown
-python3 epub_to_html.py              # -> HTML
+# → Markdown
+uv run epub_to_markdown.py epub_input/*.epub --output-dir converted
 
-# Output: each book gets its own subfolder
-# book1/book1.md    + book1/images/     (markdown)
-# book1/book1.html  + book1/images/     (html)
+# → HTML
+uv run epub_to_html.py epub_input/*.epub --output-dir converted
 ```
 
-### Convert Single EPUB
+Every `.epub` in `epub_input/` is converted. Each book gets its **own subfolder**
+inside `converted/`:
+
+```
+converted/
+├── My First Book/
+│   ├── My First Book.md      (or .html)
+│   └── images/
+└── Another Book/
+    ├── Another Book.md
+    └── images/
+```
+
+Books live in a different folder? Just point at it:
 
 ```bash
-python3 epub_to_html.py mybook.epub
-
-# Output: mybook/mybook.html + mybook/images/
+uv run epub_to_markdown.py /path/to/my/books/*.epub --output-dir converted
 ```
 
-### With Smaller Images
+> ⚠️ Use `folder/*.epub` (with the `*.epub` on the end), **not** just `folder`.
+> Passing a bare folder name makes the tool think it's one already-unzipped book.
+
+---
+
+## Convert ONE book
 
 ```bash
-python3 epub_to_markdown.py --zoom 60      # or: epub_to_html.py
-
-# All EPUBs converted with 60% image size
+uv run epub_to_markdown.py "epub_input/My Book.epub" --output-dir converted
 ```
 
-### Auto-scale Large Images (requires Pillow)
+Keep the quotes if the filename has spaces.
+
+---
+
+## Convert everything sitting in the current folder (no filenames to type)
+
+Drop your `.epub` files right next to the scripts, then just:
 
 ```bash
-python3 epub_to_html.py --auto-scale 800
-
-# Wide images capped at 800px
+uv run epub_to_markdown.py        # all *.epub in this folder → Markdown
+uv run epub_to_html.py            # all *.epub in this folder → HTML
 ```
 
-### Output to Specific Directory
+The book subfolders are created right here in the project folder.
+
+---
+
+## The 4 tweaks you'll actually use
+
+Add any of these to the **end** of a command:
+
+| I want to…                             | Add this                  |
+| -------------------------------------- | ------------------------- |
+| Send output to a tidy folder           | `--output-dir converted`  |
+| Shrink big images (e.g. to 60%)        | `--zoom 60`               |
+| Also save each chapter as its own file | `--split-chapters`        |
+| Auto-shrink huge images to 800px wide  | `--auto-scale`            |
+
+Example combining a few:
 
 ```bash
-python3 epub_to_html.py --output-dir ~/Documents/Books
-
-# Output goes to ~/Documents/Books/<book_name>/
+uv run epub_to_markdown.py epub_input/*.epub --output-dir converted --zoom 70 --split-chapters
 ```
 
-### Split into Individual Chapters
+For `--auto-scale`, add `--extra full` so the image library is available:
 
 ```bash
-python3 epub_to_html.py --split-chapters
-
-# Output: book/book.html + book/chapters/*.html + book/images/
+uv run --extra full epub_to_html.py epub_input/*.epub --output-dir converted --auto-scale
 ```
 
-## Example: Convert "economics.epub"
+---
 
-```bash
-python3 epub_to_markdown.py economics.epub   # economics/economics.md  + images/
-python3 epub_to_html.py     economics.epub   # economics/economics.html + images/
-```
+## Something went wrong?
 
-## Clean Up After Conversion
+- **`uv: command not found`** → install uv once: `brew install uv`
+- **`No EPUB files found`** → you ran it with no filenames *and* there are no
+  `.epub` files in the current folder. Use the `epub_input/*.epub` form instead.
+- **Nothing converts, or a folder is "treated as a directory"** → you passed a
+  bare folder name. Add `/*.epub` to the end of it.
 
-```bash
-rm mybook.epub      # Remove original EPUB (optional)
-# Keep: mybook/mybook.(md|html) + mybook/images/
-```
-
-## Command Reference
-
-```bash
-# Full syntax (identical for both tools)
-python3 epub_to_markdown.py [epub_files...] [options]
-python3 epub_to_html.py     [epub_files...] [options]
-
-# Options
---zoom PERCENT          # Image size (1-100, default: 100)
---include-titlepage     # Include titlepage (skipped by default)
---split-chapters        # Export individual chapter files
---output-dir DIR        # Output directory
---auto-scale [WIDTH]    # Scale large images to max WIDTH px (default 800; needs Pillow)
-
-# Examples (swap in epub_to_html.py for HTML output)
-python3 epub_to_markdown.py                              # All EPUBs in current dir
-python3 epub_to_markdown.py book.epub                    # Single EPUB
-python3 epub_to_markdown.py book1.epub book2.epub        # Multiple EPUBs
-python3 epub_to_markdown.py --zoom 60                    # With 60% images
-python3 epub_to_markdown.py --split-chapters             # With chapter files
-python3 epub_to_markdown.py --output-dir ./converted     # To specific directory
-```
-
-## Output Structure
-
-Same layout for both tools — only the extension differs (`.md` vs `.html`):
-
-```
-your-directory/
-├── epub_to_markdown.py / epub_to_html.py
-├── book.epub              # Original (can delete after)
-└── book/                  # Created automatically
-    ├── book.md  OR  book.html     # Your document
-    ├── chapters/                  # Only with --split-chapters
-    │   ├── 01_intro.(md|html)
-    │   ├── 02_chapter.(md|html)
-    │   └── ...
-    └── images/                    # All book images
-```
+Need the full picture (install options, every flag, advanced usage)? → see **README.md**.

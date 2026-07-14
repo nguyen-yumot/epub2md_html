@@ -1,48 +1,34 @@
-# EPUB to Markdown / HTML Converter
+# EPUB → Markdown / HTML Converter — Technical Guide
 
-Two Python tools that convert EPUB files while preserving images, formatting, and content structure — with strong support for Japanese EPUBs (gaiji markers, gothic/gfont emphasis, sesame dots).
+Two Python tools that convert EPUB books while preserving images, formatting, and
+reading order, with strong support for Japanese EPUBs (gaiji markers, gothic/gfont
+emphasis, sesame dots).
 
 - **`epub_to_markdown.py`** → a combined **Markdown** file (`<book>.md`)
 - **`epub_to_html.py`** → a single clean, self-styled **HTML** file (`<book>.html`)
 
-Both tools share the same EPUB parsing, the same command-line options, and the same output layout — pick whichever format you want. Every example below works with either tool: just swap the script name.
+Both tools share the same EPUB parser, the same command-line options, and the same
+output layout. Every example works with either — just swap the script name.
 
-## Features
+> **New here? Read `QUICKSTART.md` first** for copy-paste commands. This document
+> covers installation, every option, and advanced usage.
 
-- **Two output formats**: Markdown (`epub_to_markdown.py`) or self-styled HTML (`epub_to_html.py`)
-- **Auto-discovery**: Automatically finds and converts all EPUB files in a directory
-- **Preserves formatting**: Bold, italic, underline, subscript/superscript, strikethrough, highlight, tables, lists, headings, blockquotes, code
-- **Japanese EPUB support**: Handles gaiji markers, gothic/gfont emphasis, sesame dots
-- **Smart list handling**: Respects CSS `list-style-type: none` for bullet lists
-- **Automatic extraction**: No need to manually unzip EPUB files
-- **Duplicate handling**: Renames duplicate images automatically — path-aware, so same-named images in different folders don't get cross-wired
-- **Multiple encodings**: UTF-8, Shift-JIS, EUC-JP, GB2312, Big5, Latin-1, etc. (honors the file's declared encoding)
-- **HTML extras**: clean built-in stylesheet (responsive, light/dark, CJK-friendly fonts), native semantic tags, and stripped-down markup
+---
 
-## Markdown vs. HTML — which to use?
+## 1. Install
 
-|  | `epub_to_markdown.py` | `epub_to_html.py` |
-|---|---|---|
-| Output | `<book>.md` | `<book>.html` (self-contained, styled) |
-| Best for | editing, diffing, static-site pipelines, feeding to other tools | reading in a browser, printing to PDF, faithful formatting |
-| Styling | plain Markdown | clean built-in stylesheet (light/dark, responsive) |
-| Inline formatting | bold/italic/code (underline·sub·sup·strike·mark kept as raw HTML) | native `<u>`/`<sub>`/`<sup>`/`<del>`/`<mark>`/`<small>` |
-| Extra dependency | `html2text` | none beyond `beautifulsoup4` |
+This project uses [uv](https://docs.astral.sh/uv/). Dependencies are declared in
+`pyproject.toml`; you don't install them by hand.
 
-Both accept identical options and produce the same folder layout (`<book>/` with the document, `images/`, and optional `chapters/`).
-
-## Installation
-
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Dependencies are declared in `pyproject.toml`.
-
-### 1. Install uv
+### Step 1 — install uv (once)
 
 ```bash
-brew install uv          # macOS
-# or: curl -LsSf https://astral.sh/uv/install.sh | sh
+brew install uv                                   # macOS
+# or, any platform:
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 2. Install dependencies
+### Step 2 — create the environment
 
 From the project folder:
 
@@ -50,39 +36,205 @@ From the project folder:
 uv sync --extra full     # creates .venv, fetches Python ≥3.9, installs everything
 ```
 
-Use plain `uv sync` (without `--extra full`) for the minimum install.
+Plain `uv sync` installs only the minimum (no image auto-scaling / encoding fallback).
 
-| Package | Required? | Purpose |
-|---------|-----------|---------|
-| `beautifulsoup4` | required (both tools) | HTML/XML parsing |
-| `html2text` | required (Markdown tool only) | Markdown conversion |
-| `chardet` | optional (`full` extra) | Encoding-detection fallback |
-| `Pillow` | optional (`full` extra) | Image dimensions for `--auto-scale` |
+| Package          | Required?                     | Purpose                                |
+| ---------------- | ----------------------------- | -------------------------------------- |
+| `beautifulsoup4` | **required** (both tools)     | HTML/XML parsing                       |
+| `html2text`      | **required** (Markdown tool)  | Markdown conversion                    |
+| `chardet`        | optional (`full` extra)       | Encoding-detection fallback            |
+| `Pillow`         | optional (`full` extra)       | Image dimensions for `--auto-scale`    |
 
-> The HTML tool needs only `beautifulsoup4` (plus optional `Pillow`); it does **not** require `html2text`.
+> The HTML tool needs only `beautifulsoup4` (plus optional `Pillow`); it does **not**
+> need `html2text`.
 
-### 3. Run
+### Step 3 — run
 
-Prefix the commands in this guide with `uv run`:
+`uv run` executes a script inside the managed environment (no manual activation):
 
 ```bash
-uv run python epub_to_markdown.py [options] [epub_file...]   # -> Markdown
-uv run python epub_to_html.py     [options] [epub_file...]   # -> HTML
+uv run epub_to_markdown.py [options] [epub_file_or_dir ...]   # → Markdown
+uv run epub_to_html.py     [options] [epub_file_or_dir ...]   # → HTML
 ```
 
-Or activate the environment once and drop the prefix:
+Prefer a plain `python3`? Activate the environment once, then drop the `uv run`:
 
 ```bash
 source .venv/bin/activate
-python3 epub_to_markdown.py ...
+python3 epub_to_markdown.py [options] [epub_file_or_dir ...]
 ```
 
-> **Note:** the examples below are written as `python3 epub_to_markdown.py …` / `python3 epub_to_html.py …`. With uv, run them as `uv run python …` (or activate `.venv` first).
+Commands that use `--auto-scale` need the `full` extra. With an activated `.venv`
+(step 2 used `--extra full`) it just works; with `uv run` on a minimal env, add the
+extra: `uv run --extra full epub_to_html.py … --auto-scale`.
 
-<details>
-<summary>Optional: enable the short <code>epub2markdown</code> / <code>epub2html</code> commands</summary>
+---
 
-Add a build backend to `pyproject.toml` so uv installs the console entry points:
+## 2. Usage & input modes
+
+```bash
+uv run epub_to_markdown.py [options] [epub_file_or_dir ...]
+uv run epub_to_html.py     [options] [epub_file_or_dir ...]
+```
+
+How the tool interprets what you pass:
+
+| You pass…                          | It does…                                                      |
+| ---------------------------------- | ------------------------------------------------------------ |
+| **nothing**                        | Converts every `*.epub` in the **current** folder (not recursive) |
+| **one `.epub` file**               | Converts that book                                           |
+| **several `.epub` files**          | Converts each one                                            |
+| **a folder** *(no `.epub` suffix)* | Treats it as a single **already-extracted** EPUB directory   |
+
+### Converting a whole folder of books — the important detail
+
+Passing a *folder name* does **not** batch the EPUBs inside it (the tool reads it as
+one unzipped book). To convert every book in a folder, let your **shell expand a glob**
+so each file arrives as its own argument:
+
+```bash
+uv run epub_to_markdown.py epub_input/*.epub --output-dir converted
+uv run epub_to_html.py     path/to/books/*.epub --output-dir converted
+```
+
+Each matched `.epub` becomes its own subfolder under `converted/`.
+
+---
+
+## 3. Options
+
+Both tools accept the same options:
+
+| Option                 | Description                                             | Default           |
+| ---------------------- | ------------------------------------------------------- | ----------------- |
+| `--zoom PERCENT`       | Image display size, 1–100                               | `100`             |
+| `--include-titlepage`  | Include the titlepage in output                         | skipped           |
+| `--split-chapters`     | Also export per-chapter files into `chapters/`          | disabled          |
+| `--output-dir DIR`     | Where all book subfolders are written                   | current directory |
+| `--auto-scale [WIDTH]` | Downscale wide images to max `WIDTH` px. Needs `Pillow`. | disabled (WIDTH `800` when the flag is given without a value) |
+| `-h`, `--help`         | Show help and exit                                      | —                 |
+
+**Image sizing precedence** when `--auto-scale` is active:
+
+1. Gaiji (inline symbols) → `height: 1em` (always)
+2. Explicit HTML sizing on the image → preserved as-is
+3. Auto-scale → images wider than `WIDTH` capped to it
+4. Small images (≤ `WIDTH`) → left untouched
+
+`--zoom` is a display-percentage applied on top; `--auto-scale` changes the pixel cap.
+
+---
+
+## 4. Output structure
+
+Both tools produce the same layout — only the document extension differs:
+
+```
+<output-dir>/                     # cwd, or whatever --output-dir points to
+└── <book>/                       # one subfolder per book, created automatically
+    ├── <book>.md   OR  <book>.html   # the complete document
+    ├── chapters/                     # only with --split-chapters
+    │   ├── 01_introduction.(md|html)
+    │   ├── 02_chapter_one.(md|html)
+    │   └── ...
+    └── images/                       # every image from the book
+        ├── cover.jpg
+        └── figure1.png
+```
+
+The `<book>.html` is fully self-contained (the stylesheet is embedded); each split
+chapter is a standalone, styled page. Image references use `images/…`
+(or `../images/…` from inside `chapters/`).
+
+---
+
+## 5. What gets converted
+
+- All text content, in reading order
+- All images (copied into `images/`; duplicate names are disambiguated path-aware, so
+  same-named images in different EPUB folders don't collide)
+- Book metadata (title, author, publisher, date)
+- Headings and document structure
+- **Bold** (incl. `.bold`, `.gothic`, `.gfont` classes), *italic* (incl. gaiji markers
+  such as `tm2.png` / `tu2.png`)
+- Underline, subscript, superscript, strikethrough, highlight, small text
+- Tables, and lists (respects CSS `list-style-type: none`)
+- Multiple text encodings — UTF-8, Shift-JIS, EUC-JP, GB2312, Big5, Latin-1, … (honors
+  the file's declared encoding, with a `chardet` fallback when the `full` extra is present)
+
+### Markdown vs. HTML — which to pick
+
+|                    | `epub_to_markdown.py`                       | `epub_to_html.py`                                    |
+| ------------------ | ------------------------------------------- | ---------------------------------------------------- |
+| Output             | `<book>.md`                                 | `<book>.html` (self-contained, styled)               |
+| Best for           | editing, diffing, pipelines, other tools    | reading in a browser, printing to PDF                |
+| Styling            | plain Markdown                              | built-in stylesheet: responsive, light/dark, CJK fonts |
+| Inline formatting  | bold/italic/code (sub·sup·underline·strike·mark kept as raw HTML) | native `<u>`/`<sub>`/`<sup>`/`<del>`/`<mark>`/`<small>` |
+| Extra dependency   | `html2text`                                 | none beyond `beautifulsoup4`                         |
+
+The HTML converter reuses the Markdown tool's content normalization, then writes clean
+HTML directly instead of round-tripping through `html2text`: CSS classes become real
+semantic tags, presentational noise (`class`, `id`, `xmlns`, vendor wrappers like Kobo's
+per-sentence spans) is stripped while `src`/`href`/`alt`/`style` and table structure are
+kept, `<script>` is removed, and SVG cover pages become plain `<img>`.
+
+---
+
+## 6. Advanced examples
+
+```bash
+# Batch a folder → Markdown, into ./converted, 70% image size, per-chapter files
+uv run epub_to_markdown.py epub_input/*.epub \
+    --output-dir converted --zoom 70 --split-chapters
+
+# One book → HTML, cap wide images at 600px (needs Pillow / full extra)
+uv run --extra full epub_to_html.py "epub_input/My Book.epub" \
+    --output-dir converted --auto-scale 600
+
+# Everything in the current folder → HTML, keeping titlepages
+uv run epub_to_html.py --include-titlepage
+
+# Re-process an already-extracted EPUB directory (mode 4)
+uv run epub_to_markdown.py path/to/unzipped_book_dir --output-dir converted
+```
+
+---
+
+## 7. Troubleshooting
+
+**`uv: command not found`**
+uv isn't installed — see step 1.
+
+**`No EPUB files found`**
+You ran with no filenames and the current folder has no `.epub`. Pass files explicitly,
+e.g. `uv run epub_to_markdown.py epub_input/*.epub`.
+
+**A folder "converts" as one weird book, or nothing happens**
+You passed a bare folder name (interpreted as one extracted EPUB). Use `folder/*.epub`.
+
+**`ModuleNotFoundError: No module named 'bs4'` (or `html2text`)**
+Dependencies aren't set up, or you're outside the environment:
+```bash
+uv sync --extra full
+uv run epub_to_markdown.py ...        # or: source .venv/bin/activate
+```
+
+**`--auto-scale` seems ignored**
+It needs `Pillow`. Use the `full` extra: `uv run --extra full … --auto-scale`.
+
+**Images not displaying**
+Keep `images/` next to the document: `book/book.(md|html)` + `book/images/`.
+
+**Corrupted / non-standard EPUB**
+Open it in an EPUB reader to confirm it's valid, and check it has a
+`META-INF/container.xml`.
+
+---
+
+## 8. Optional: short `epub2markdown` / `epub2html` commands
+
+`pyproject.toml` already declares console entry points, but installing them needs a
+build backend. Add this to `pyproject.toml`:
 
 ```toml
 [build-system]
@@ -93,195 +245,10 @@ build-backend = "hatchling.build"
 include = ["epub_to_markdown.py", "epub_to_html.py"]
 ```
 
-Then re-run `uv sync --extra full` and use `uv run epub2markdown …` / `uv run epub2html …`.
-</details>
+Then `uv sync --extra full` and use `uv run epub2markdown …` / `uv run epub2html …`.
 
-## Quick Start
-
-Convert every EPUB in the current folder:
-
-```bash
-python3 epub_to_markdown.py         # -> Markdown
-python3 epub_to_html.py             # -> HTML
-```
-
-Each book gets its own subfolder:
-
-```
-book1/book1.md    + book1/images/     # markdown tool
-book1/book1.html  + book1/images/     # html tool
-```
-
-Convert a single book, or use options (identical for both tools):
-
-```bash
-python3 epub_to_html.py mybook.epub              # single book -> HTML
-python3 epub_to_markdown.py --zoom 60            # smaller images (60%)
-python3 epub_to_html.py --split-chapters         # + per-chapter files
-python3 epub_to_markdown.py --output-dir ./out   # choose output folder
-```
-
-## Usage
-
-```bash
-python3 epub_to_markdown.py [options] [epub_file_or_dir...]   # Markdown
-python3 epub_to_html.py     [options] [epub_file_or_dir...]   # HTML
-```
-
-### Modes
-
-1. **No arguments**: Process all `.epub` files in current directory
-2. **Single EPUB file**: Process that specific file
-3. **Multiple EPUB files**: Process each one
-4. **Extracted directory**: Process pre-extracted EPUB directory
-
-### Options
-
-Both tools accept the same options:
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--zoom PERCENT` | Image display size (1-100) | 100 |
-| `--include-titlepage` | Include titlepage in output | Skipped |
-| `--split-chapters` | Export individual chapter files to `chapters/` | Disabled |
-| `--output-dir DIR` | Output directory for all conversions | Current directory |
-| `--auto-scale [WIDTH]` | Scale large images down to max `WIDTH` px (default 800). Requires `Pillow`. | Disabled |
-| `-h, --help` | Show help message | - |
-
-## Output Structure
-
-Both tools use the same layout — only the document's extension differs (`.md` vs `.html`):
-
-```
-your-directory/
-├── epub_to_markdown.py / epub_to_html.py
-├── book.epub               # Original EPUB (can delete)
-└── book/                   # Created automatically
-    ├── book.md  OR  book.html     # Complete document
-    ├── chapters/                  # Only with --split-chapters
-    │   ├── 01_chapter_one.(md|html)
-    │   ├── 02_chapter_two.(md|html)
-    │   └── ...
-    └── images/                    # All book images
-        ├── cover.jpg
-        ├── figure1.png
-        └── ...
-```
-
-The `<book>.html` is a single self-contained file (the stylesheet is embedded), and each split chapter is a standalone HTML page. Image references use `images/…` (or `../images/…` inside `chapters/`).
-
-## What Gets Converted
-
-- All text content in reading order
-- All images (preserved in `images/` directory)
-- Book metadata (title, author, publisher, date)
-- Headings and document structure
-- **Bold text** (including `.bold`, `.gothic`, `.gfont` classes)
-- *Italic text* (including gaiji markers like tm2.png/tu2.png)
-- Underline, subscript, superscript, strikethrough, highlight, small text
-- Tables
-- Lists (respects `list-style-type: none` CSS)
-
-## HTML output (`epub_to_html.py`)
-
-The HTML converter reuses the same content normalization as the Markdown tool, then writes clean HTML directly instead of running it through `html2text`:
-
-- **Self-contained & styled** — one `<book>.html` with an embedded stylesheet: a centered readable column, responsive images (`max-width:100%`), styled blockquotes/code/tables, CJK-friendly fonts, and automatic **light/dark** mode.
-- **Semantic tags** — CSS classes become real tags: `.bold`/`.gothic`/`.gfont` → `<strong>`, `.italic` → `<em>`, and underline/subscript/superscript/strikethrough/highlight/small become native `<u>`/`<sub>`/`<sup>`/`<del>`/`<mark>`/`<small>` (Markdown can't represent several of these).
-- **Cleaned markup** — presentational noise (`class`, `id`, `xmlns`, and vendor wrappers such as Kobo's per-sentence spans) is stripped; `src`/`href`/`alt`/`style` and table structure (`colspan`/`rowspan`) are kept. `<script>` tags are removed.
-- **Images** — copied to `images/`, with sizing applied inline (gaiji → `1em`, explicit sizes, `--auto-scale`, `--zoom`); SVG cover pages are converted to plain `<img>`.
-- **No `html2text` needed** — only `beautifulsoup4` (plus optional `Pillow` for `--auto-scale`).
-
-Open the resulting `.html` directly in any browser; with `--split-chapters`, each chapter file is a standalone, styled page.
-
-## Examples
-
-### Convert a textbook to Markdown
-
-```bash
-python3 epub_to_markdown.py economics.epub
-
-# Result:
-# economics/
-# ├── economics.md
-# └── images/
-```
-
-### Convert to HTML (single self-styled file)
-
-```bash
-python3 epub_to_html.py economics.epub
-
-# Result:
-# economics/
-# ├── economics.html      # open in any browser
-# └── images/
-```
-
-### Batch Convert with Small Images
-
-```bash
-python3 epub_to_markdown.py --zoom 50     # or: epub_to_html.py
-
-# All EPUBs converted with 50% image size
-```
-
-### Auto-scale large images (requires Pillow)
-
-```bash
-python3 epub_to_html.py --auto-scale 800 mybook.epub   # cap wide images at 800px
-```
-
-### Convert to a Specific Directory
-
-```bash
-python3 epub_to_html.py --output-dir ~/Documents/Books
-
-# All books go to ~/Documents/Books/<book_name>/
-```
-
-### Split into Individual Chapters
-
-```bash
-python3 epub_to_html.py --split-chapters mybook.epub   # or: epub_to_markdown.py
-
-# Result:
-# mybook/
-# ├── mybook.html          # Complete book
-# ├── chapters/            # Individual chapters (standalone, styled)
-# │   ├── 01_introduction.html
-# │   ├── 02_chapter_one.html
-# │   └── ...
-# └── images/
-```
-
-## Troubleshooting
-
-### Error: "No EPUB files found"
-- Navigate to folder containing EPUB files
-- Or specify file directly: `python3 epub_to_markdown.py /path/to/book.epub`
-
-### Error: "ModuleNotFoundError: No module named 'bs4'" (or 'html2text')
-Dependencies aren't installed, or you're not running inside the uv environment:
-```bash
-uv sync --extra full
-uv run python epub_to_markdown.py ...    # or: source .venv/bin/activate
-```
-
-### Images not displaying
-- Ensure the `images/` directory sits next to your `.md`/`.html` file
-- The structure should be: `book/book.md` (or `book.html`) + `book/images/`
-
-### Corrupted or non-standard EPUB
-- Try opening the EPUB in an EPUB reader first to verify it works
-- Check if the EPUB has a valid `META-INF/container.xml` file
-
-## Documentation
-
-- `QUICKSTART.md` - Quick start guide
-- `COMMANDS.md` - Complete command reference
-- `CHEATSHEET.txt` - Quick reference card
+---
 
 ## License
 
-MIT License
+MIT

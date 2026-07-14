@@ -33,6 +33,7 @@ htmlcov/
 
 # Project I/O (input EPUBs and generated output)
 /epub/
+/epub_input/
 /converted/
 *.epub
 
